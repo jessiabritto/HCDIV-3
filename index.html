@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+  <div id="chart"></div>
+  <script>
+    // Define central towns (example list; update as per the dataset)
+    const centralTowns = [
+      "Central Area", "Bukit Timah", "Queenstown", 
+      "Toa Payoh", "Kallang/Whampoa", "Novena"
+    ];
+
+    d3.csv("ResaleflatpricesbasedonregistrationdatefromJan2017onwards.csv").then(data => {
+      // Parse data and filter for the last 5 years
+      const filteredData = data.filter(d => {
+        const year = new Date(d['registration_date']).getFullYear();
+        return year >= 2019 && year <= 2024; // Adjust according to the dataset format
+      });
+
+      // Categorize towns into "Central" or "Outlying"
+      filteredData.forEach(d => {
+        d.category = centralTowns.includes(d['town']) ? "Central" : "Outlying";
+      });
+
+      // Aggregate average prices by category
+      const categoryPrices = d3.rollup(
+        filteredData,
+        v => d3.mean(v, d => +d['resale_price']),
+        d => d.category
+      );
+
+      const categories = Array.from(categoryPrices.keys());
+      const avgPrices = Array.from(categoryPrices.values());
+
+      // Define chart dimensions
+      const margin = { top: 20, right: 30, bottom: 40, left: 60 };
+      const width = 800 - margin.left - margin.right;
+      const height = 400 - margin.top - margin.bottom;
+
+      // Create SVG container
+      const svg = d3.select("#chart")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+      // Create scales
+      const x = d3.scaleBand()
+        .domain(categories)
+        .range([0, width])
+        .padding(0.4);
+
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(avgPrices)])
+        .range([height, 0]);
+
+      // Add X axis
+      svg.append("g")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(x));
+
+      // Add Y axis
+      svg.append("g")
+        .call(d3.axisLeft(y));
+
+      // Add bars
+      svg.selectAll("rect")
+        .data(categories.map((category, i) => ({ category, price: avgPrices[i] })))
+        .enter()
+        .append("rect")
+        .attr("x", d => x(d.category))
+        .attr("y", d => y(d.price))
+        .attr("width", x.bandwidth())
+        .attr("height", d => height - y(d.price))
+        .attr("fill", "steelblue");
+
+      // Add axis labels
+      svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", height + margin.bottom)
+        .attr("text-anchor", "middle")
+        .text("Category (Central vs. Outlying)");
+
+      svg.append("text")
+        .attr("x", -height / 2)
+        .attr("y", -margin.left / 2)
+        .attr("text-anchor", "middle")
+        .attr("transform", "rotate(-90)")
+        .text("Average Resale Price");
+    });
+  </script>
+</body>
+</html>
