@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -18,7 +19,7 @@
     d3.csv("ResaleflatpricesbasedonregistrationdatefromJan2017onwards.csv").then(data => {
       // Parse date and filter for the last 5 years (2019-2024)
       const filteredData = data.filter(d => {
-        const parsedDate = parseDate(d['registration_date']);
+        const parsedDate = parseDate(d['month']); // Changed 'registration_date' to 'month'
         if (parsedDate) {
           const year = parsedDate.getFullYear();
           return year >= 2019 && year <= 2024; // Adjust according to the dataset format
@@ -57,4 +58,52 @@
         .attr("width", width + margin.left + margin.right)
         .attr("height", height + margin.top + margin.bottom)
         .append("g")
-        .attr("transform", `translate(
+        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+      // Create scales
+      const x = d3.scaleBand()
+        .domain(categories)
+        .range([0, width])
+        .padding(0.4);
+
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(avgPrices)])
+        .range([height, 0]);
+
+      // Add X axis
+      svg.append("g")
+        .attr("transform", `translate(0,${height})`)
+        .call(d3.axisBottom(x));
+
+      // Add Y axis
+      svg.append("g")
+        .call(d3.axisLeft(y));
+
+      // Add bars
+      svg.selectAll("rect")
+        .data(categories.map((category, i) => ({ category, price: avgPrices[i] })))
+        .enter()
+        .append("rect")
+        .attr("x", d => x(d.category))
+        .attr("y", d => y(d.price))
+        .attr("width", x.bandwidth())
+        .attr("height", d => height - y(d.price))
+        .attr("fill", "steelblue");
+
+      // Add axis labels
+      svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", height + margin.bottom)
+        .attr("text-anchor", "middle")
+        .text("Category (Central vs. Outlying)");
+
+      svg.append("text")
+        .attr("x", -height / 2)
+        .attr("y", -margin.left / 2)
+        .attr("text-anchor", "middle")
+        .attr("transform", "rotate(-90)")
+        .text("Average Resale Price");
+    });
+  </script>
+</body>
+</html>
