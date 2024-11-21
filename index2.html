@@ -120,12 +120,14 @@
             .padding(0.2);
 
         const yScale = d3.scaleLinear()
-            .range([chartHeight, 0]);
+            .range([chartHeight, 0])
+            .domain([0, 900000]); // Fixed y-axis domain
 
         const xAxis = chart.append("g")
             .attr("transform", `translate(0,${chartHeight})`);
 
-        const yAxis = chart.append("g");
+        const yAxis = chart.append("g")
+            .call(d3.axisLeft(yScale));
 
         svg.append("text")
             .attr("x", width / 2)
@@ -153,12 +155,10 @@
             ).map(([town, avgPrice]) => ({ town, avgPrice }));
         }
 
-        function updateChart(data, referenceData) {
+        function updateChart(data) {
             xScale.domain(data.map(d => d.town));
-            yScale.domain([0, d3.max(data, d => d.avgPrice)]).nice();
 
             xAxis.transition().duration(1000).call(d3.axisBottom(xScale));
-            yAxis.transition().duration(1000).call(d3.axisLeft(yScale));
 
             const bars = chart.selectAll(".bar").data(data, d => d.town);
 
@@ -211,13 +211,13 @@
                 const data2023 = calculateAverage(data, "2023");
                 const data2024 = calculateAverage(data, "2024");
 
-                updateChart(data2023, []);
+                updateChart(data2023);
 
-                document.getElementById("year-2020").addEventListener("click", () => updateChart(data2020, []));
-                document.getElementById("year-2021").addEventListener("click", () => updateChart(data2021, []));
-                document.getElementById("year-2022").addEventListener("click", () => updateChart(data2022, []));
-                document.getElementById("year-2023").addEventListener("click", () => updateChart(data2023, []));
-                document.getElementById("year-2024").addEventListener("click", () => updateChart(data2024, data2023));
+                document.getElementById("year-2020").addEventListener("click", () => updateChart(data2020));
+                document.getElementById("year-2021").addEventListener("click", () => updateChart(data2021));
+                document.getElementById("year-2022").addEventListener("click", () => updateChart(data2022));
+                document.getElementById("year-2023").addEventListener("click", () => updateChart(data2023));
+                document.getElementById("year-2024").addEventListener("click", () => updateChart(data2024));
             })
             .catch(error => console.error("Error loading CSV:", error));
     </script>
