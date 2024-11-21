@@ -1,109 +1,138 @@
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resale Prices Chart</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* Center the chart horizontally */
+        #chart-container {
+            text-align: center;
+        }
+        
+        /* Basic styles for the chart */
+        .bar {
+            transition: all 0.3s ease;
+        }
+
+        .bar:hover {
+            opacity: 0.7;
+        }
+
+        .axis path, .axis line {
+            shape-rendering: crispEdges;
+        }
+
+        h2 {
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-  <div id="chart"></div>
-  <script>
-    // Define central towns (example list; update as per the dataset)
-    const centralTowns = [
-      "Central Area", "Bukit Timah", "Queenstown", 
-      "Toa Payoh", "Kallang/Whampoa", "Novena"
-    ];
+    <h2>Average Resale Prices (2023)</h2>
+    <div id="chart-container">
+        <svg id="chart"></svg>
+    </div>
 
-    // Define a date parser for the format yyyy-mm
-    const parseDate = d3.timeParse("%Y-%m"); // Adjusted for yyyy-mm format
+    <script>
+        // Chart dimensions
+        const width = 800;
+        const height = 500;
+        const margin = { top: 50, right: 50, bottom: 50, left: 80 };
 
-    d3.csv("ResaleflatpricesbasedonregistrationdatefromJan2017onwards.csv").then(data => {
-      // Parse date and filter for the last 5 years (2019-2024)
-      const filteredData = data.filter(d => {
-        const parsedDate = parseDate(d['month']); // Changed 'registration_date' to 'month'
-        if (parsedDate) {
-          const year = parsedDate.getFullYear();
-          return year >= 2019 && year <= 2024; // Adjust according to the dataset format
-        }
-        return false;
-      });
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
 
-      // Check if data is valid (ensure that 'resale_price' and 'town' are defined and valid)
-      const validData = filteredData.filter(d => {
-        return d['resale_price'] && d['town'] && !isNaN(d['resale_price']);
-      });
+        // Create the SVG container
+        const svg = d3.select("#chart")
+            .attr("width", width)
+            .attr("height", height);
 
-      // Categorize towns into "Central" or "Outlying"
-      validData.forEach(d => {
-        d.category = centralTowns.includes(d['town']) ? "Central" : "Outlying";
-      });
+        const chart = svg.append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
 
-      // Aggregate average prices by category
-      const categoryPrices = d3.rollup(
-        validData,
-        v => d3.mean(v, d => +d['resale_price']),
-        d => d.category
-      );
+        // Load the CSV file (adjust the path as needed)
+        d3.csv("ResaleflatpricesbasedonregistrationdatefromJan2017onwards.csv")
+            .then(function(data) {
+                console.log("Data loaded successfully:", data);
 
-      const categories = Array.from(categoryPrices.keys());
-      const avgPrices = Array.from(categoryPrices.values());
+                // Filter data for the year 2023 and selected towns
+                const filteredData = data.filter(d => {
+                    const year = d.month.split("-")[0];
+                    return year === "2023" && ["BUKIT BATOK", "JURONG EAST", "CLEMENTI"].includes(d.town.trim().toUpperCase());
+                });
 
-      // Define chart dimensions
-      const margin = { top: 20, right: 30, bottom: 40, left: 60 };
-      const width = 800 - margin.left - margin.right;
-      const height = 400 - margin.top - margin.bottom;
+                console.log("Filtered Data:", filteredData);
 
-      // Create SVG container
-      const svg = d3.select("#chart")
-        .append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
-        .append("g")
-        .attr("transform", `translate(${margin.left},${margin.top})`);
+                // Calculate average resale price per town
+                const averagePrices = d3.rollups(
+                    filteredData,
+                    v => d3.mean(v, d => +d.resale_price),
+                    d => d.town
+                ).map(([town, avgPrice]) => ({ town, avgPrice }));
 
-      // Create scales
-      const x = d3.scaleBand()
-        .domain(categories)
-        .range([0, width])
-        .padding(0.4);
+                console.log("Average Prices:", averagePrices);
 
-      const y = d3.scaleLinear()
-        .domain([0, d3.max(avgPrices)])
-        .range([height, 0]);
+                // Pastel color scale (using d3 scaleOrdinal and pastels)
+                const colorScale = d3.scaleOrdinal()
+                    .domain(["BUKIT BATOK", "JURONG EAST", "CLEMENTI"])
+                    .range(["#AEC6CF", "#FFB3BA", "#D4E157"]); // Pastel color hues
 
-      // Add X axis
-      svg.append("g")
-        .attr("transform", `translate(0,${height})`)
-        .call(d3.axisBottom(x));
+                // Scales
+                const xScale = d3.scaleBand()
+                    .domain(averagePrices.map(d => d.town))
+                    .range([0, chartWidth])
+                    .padding(0.2);
 
-      // Add Y axis
-      svg.append("g")
-        .call(d3.axisLeft(y));
+                const yScale = d3.scaleLinear()
+                    .domain([0, d3.max(averagePrices, d => d.avgPrice)])
+                    .nice()
+                    .range([chartHeight, 0]);
 
-      // Add bars
-      svg.selectAll("rect")
-        .data(categories.map((category, i) => ({ category, price: avgPrices[i] })))
-        .enter()
-        .append("rect")
-        .attr("x", d => x(d.category))
-        .attr("y", d => y(d.price))
-        .attr("width", x.bandwidth())
-        .attr("height", d => height - y(d.price))
-        .attr("fill", "steelblue");
+                // Axes
+                chart.append("g")
+                    .attr("transform", `translate(0,${chartHeight})`)
+                    .call(d3.axisBottom(xScale));
 
-      // Add axis labels
-      svg.append("text")
-        .attr("x", width / 2)
-        .attr("y", height + margin.bottom)
-        .attr("text-anchor", "middle")
-        .text("Category (Central vs. Outlying)");
+                chart.append("g")
+                    .call(d3.axisLeft(yScale));
 
-      svg.append("text")
-        .attr("x", -height / 2)
-        .attr("y", -margin.left / 2)
-        .attr("text-anchor", "middle")
-        .attr("transform", "rotate(-90)")
-        .text("Average Resale Price");
-    });
-  </script>
+                // Bars with different pastel colors
+                chart.selectAll(".bar")
+                    .data(averagePrices)
+                    .enter()
+                    .append("rect")
+                    .attr("class", "bar")
+                    .attr("x", d => xScale(d.town))
+                    .attr("y", d => yScale(d.avgPrice))
+                    .attr("width", xScale.bandwidth())
+                    .attr("height", d => chartHeight - yScale(d.avgPrice))
+                    .style("fill", d => colorScale(d.town))  // Apply color based on town
+                    .style("opacity", 0.8);
+                    
+                svg.append("text")
+                .attr("x", width / 2)
+                .attr("y", height - 10)
+                .attr("text-anchor", "middle")
+                .attr("font-size", "14px")
+                .text("Town");
+
+                svg.append("text")
+                .attr("transform", "rotate(-90)")  // Rotate the text to be vertical
+                .attr("x", -height / 2)
+                .attr("y", 20)
+                .attr("text-anchor", "middle")
+                .attr("font-size", "14px")
+                .text("Average Resale Price (SGD)");
+
+
+
+            })
+            .catch(function(error) {
+                console.error("Error loading CSV:", error);
+            });
+    </script>
 </body>
 </html>

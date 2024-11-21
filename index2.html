@@ -1,0 +1,225 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resale Prices Chart</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            background-color: #ebe4d6; 
+            font-family: Arial, sans-serif; 
+            margin: 0; 
+            padding: 0; 
+        }
+
+        #chart-container {
+            text-align: center;
+        }
+
+        .bar {
+            transition: all 0.3s ease;
+        }
+
+        .bar:hover {
+            opacity: 0.7;
+            outline: 3px solid #333; 
+            outline-offset: -3px; 
+        }
+
+        .axis path, .axis line {
+            shape-rendering: crispEdges;
+        }
+
+        h1 {
+            text-align: center;
+            font-family: 'Times New Roman', Times, serif;
+            color: #000000a8;
+        }
+
+        .para {
+            text-align: center;
+            font-family: 'Times New Roman', Times, serif;
+        }
+
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            padding: 8px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 5px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .button-container {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 10px 15px;
+            margin: 5px;
+            border: none;
+            background-color: #627152;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <h1>Average Resale Prices in Western Districts</h1>
+    <div class="para">
+        <p>This is a data visualization highlighting key housing trends across western towns like Bukit Batok, Jurong East, Clementi, Jurong West, and Bukit Timah.
+         <br>Hypothesis : <i>The average resale prices of HDB flats in western towns have shown significant variations across the years from 2020 to 2024</i></p>
+        <p>Resale prices in Singapore's western districts show a year-on-year increase, reflecting a growing demand for housing in these areas. Premium districts such as Bukit Timah exhibit significantly higher average resale prices compared to other western towns like Jurong West and Bukit Batok. This chart allows you to compare average resale prices across the years using the buttons below.</p>
+    </div>
+    <div class="button-container">
+        <button id="year-2020">2020</button>
+        <button id="year-2021">2021</button>
+        <button id="year-2022">2022</button>
+        <button id="year-2023">2023</button>
+        <button id="year-2024">2024</button>
+    </div>
+    <div id="chart-container">
+        <svg id="chart"></svg>
+    </div>
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        const width = 1200;
+        const height = 600;
+        const margin = { top: 50, right: 50, bottom: 50, left: 80 };
+
+        const chartWidth = width - margin.left - margin.right;
+        const chartHeight = height - margin.top - margin.bottom;
+
+        const svg = d3.select("#chart")
+            .attr("width", width)
+            .attr("height", height);
+
+        const chart = svg.append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const tooltip = d3.select("#tooltip");
+
+        const colorScale = d3.scaleOrdinal()
+            .domain(["BUKIT BATOK", "JURONG EAST", "CLEMENTI", "JURONG WEST", "BUKIT TIMAH"])
+            .range(["#AEC6CF", "#FFB3BA", "#D4E157", "#FFDAC1", "#B39DDB"]);
+
+        const xScale = d3.scaleBand()
+            .range([0, chartWidth])
+            .padding(0.2);
+
+        const yScale = d3.scaleLinear()
+            .range([chartHeight, 0]);
+
+        const xAxis = chart.append("g")
+            .attr("transform", `translate(0,${chartHeight})`);
+
+        const yAxis = chart.append("g");
+
+        svg.append("text")
+            .attr("x", width / 2)
+            .attr("y", height - 10)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "14px")
+            .text("Town");
+
+        svg.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("x", -height / 2)
+            .attr("y", 20)
+            .attr("text-anchor", "middle")
+            .attr("font-size", "14px")
+            .text("Average Resale Price (SGD)");
+
+        function calculateAverage(data, year) {
+            const filteredData = data.filter(d => d.month.startsWith(year) &&
+                ["BUKIT BATOK", "JURONG EAST", "CLEMENTI", "JURONG WEST", "BUKIT TIMAH"].includes(d.town.trim().toUpperCase()));
+
+            return d3.rollups(
+                filteredData,
+                v => d3.mean(v, d => +d.resale_price),
+                d => d.town.trim().toUpperCase()
+            ).map(([town, avgPrice]) => ({ town, avgPrice }));
+        }
+
+        function updateChart(data, referenceData) {
+            xScale.domain(data.map(d => d.town));
+            yScale.domain([0, d3.max(data, d => d.avgPrice)]).nice();
+
+            xAxis.transition().duration(1000).call(d3.axisBottom(xScale));
+            yAxis.transition().duration(1000).call(d3.axisLeft(yScale));
+
+            const bars = chart.selectAll(".bar").data(data, d => d.town);
+
+            bars.transition()
+                .duration(1000)
+                .attr("x", d => xScale(d.town))
+                .attr("y", d => yScale(d.avgPrice))
+                .attr("width", xScale.bandwidth())
+                .attr("height", d => chartHeight - yScale(d.avgPrice))
+                .style("fill", d => colorScale(d.town));
+
+            bars.enter()
+                .append("rect")
+                .attr("class", "bar")
+                .attr("x", d => xScale(d.town))
+                .attr("y", chartHeight)
+                .attr("width", xScale.bandwidth())
+                .attr("height", 0)
+                .style("fill", d => colorScale(d.town))
+                .on("mouseover", function (event, d) {
+                    d3.select(this).style("fill", d3.color(colorScale(d.town)).brighter(0.5));
+                    tooltip.html(`<strong>${d.town}</strong><br>Avg Price: $${d.avgPrice.toLocaleString()}`)
+                        .style("left", (event.pageX + 10) + "px")
+                        .style("top", (event.pageY - 20) + "px")
+                        .style("opacity", 1);
+                })
+                .on("mousemove", event => {
+                    tooltip.style("left", (event.pageX + 10) + "px")
+                           .style("top", (event.pageY - 20) + "px");
+                })
+                .on("mouseout", function () {
+                    d3.select(this).style("fill", d => colorScale(d.town));
+                    tooltip.style("opacity", 0);
+                })
+                .transition()
+                .duration(1000)
+                .attr("y", d => yScale(d.avgPrice))
+                .attr("height", d => chartHeight - yScale(d.avgPrice));
+
+            bars.exit().transition().duration(1000).attr("y", chartHeight).attr("height", 0).remove();
+        }
+
+        d3.csv("ResaleflatpricesbasedonregistrationdatefromJan2017onwards.csv")
+            .then(data => {
+                data.forEach(d => { d.resale_price = +d.resale_price; });
+
+                const data2020 = calculateAverage(data, "2020");
+                const data2021 = calculateAverage(data, "2021");
+                const data2022 = calculateAverage(data, "2022");
+                const data2023 = calculateAverage(data, "2023");
+                const data2024 = calculateAverage(data, "2024");
+
+                updateChart(data2023, []);
+
+                document.getElementById("year-2020").addEventListener("click", () => updateChart(data2020, []));
+                document.getElementById("year-2021").addEventListener("click", () => updateChart(data2021, []));
+                document.getElementById("year-2022").addEventListener("click", () => updateChart(data2022, []));
+                document.getElementById("year-2023").addEventListener("click", () => updateChart(data2023, []));
+                document.getElementById("year-2024").addEventListener("click", () => updateChart(data2024, data2023));
+            })
+            .catch(error => console.error("Error loading CSV:", error));
+    </script>
+</body>
+</html>
